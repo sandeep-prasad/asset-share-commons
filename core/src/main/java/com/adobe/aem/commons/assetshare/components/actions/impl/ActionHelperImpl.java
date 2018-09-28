@@ -22,6 +22,7 @@ package com.adobe.aem.commons.assetshare.components.actions.impl;
 import com.adobe.aem.commons.assetshare.components.actions.ActionHelper;
 import com.adobe.aem.commons.assetshare.configuration.Config;
 import com.adobe.aem.commons.assetshare.content.AssetModel;
+import com.adobe.granite.asset.api.AssetException;
 import com.day.cq.wcm.api.WCMMode;
 import org.apache.sling.api.SlingHttpServletRequest;
 import org.apache.sling.api.request.RequestParameter;
@@ -30,46 +31,57 @@ import org.apache.sling.models.factory.ModelFactory;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
 
+import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.Collection;
 
 @Component
 public final class ActionHelperImpl implements ActionHelper {
 
-    @Reference
-    private ModelFactory modelFactory;
+	@Reference
+	private ModelFactory modelFactory;
 
-    public final Collection<AssetModel> getAssetsFromQueryParameter(final SlingHttpServletRequest request, final String parameterName) {
-        final RequestParameter[] requestParameters = request.getRequestParameters(parameterName);
-        final Collection<AssetModel> assets = new ArrayList<>();
+	public final Collection<AssetModel> getAssetsFromQueryParameter(final SlingHttpServletRequest request,
+			final String parameterName) {
+		final RequestParameter[] requestParameters = request.getRequestParameters(parameterName);
+		final Collection<AssetModel> assets = new ArrayList<>();
 
-        if (requestParameters != null) {
-            for (final RequestParameter requestParameter : requestParameters) {
-                final Resource resource = request.getResourceResolver().getResource(requestParameter.getString());
-                if (resource != null) {
-                    final AssetModel asset = modelFactory.getModelFromWrappedRequest(request, resource, AssetModel.class);
+		if (requestParameters != null) {
+			for (final RequestParameter requestParameter : requestParameters) {
+				Resource resource;
+				try {
+					resource = request.getResourceResolver()
+							.getResource(URLDecoder.decode(requestParameter.getString(), "UTF-8"));
 
-                    if (asset != null) {
-                        assets.add(asset);
-                    }
-                }
-            }
-        }
+					if (resource != null) {
+						final AssetModel asset = modelFactory.getModelFromWrappedRequest(request, resource,
+								AssetModel.class);
 
-        return assets;
-    }
+						if (asset != null) {
+							assets.add(asset);
+						}
+					}
+				} catch (UnsupportedEncodingException e) {
+					throw new AssetException("Could not Decode the path", requestParameter.getString());
+				}
+			}
+		}
 
-    public final Collection<AssetModel> getPlaceholderAsset(final SlingHttpServletRequest request) {
-        final Collection<AssetModel> assets = new ArrayList<>();
+		return assets;
+	}
 
-        if (!WCMMode.DISABLED.equals(WCMMode.fromRequest(request))) {
-            final Config config = request.adaptTo(Config.class);
-            final AssetModel placeholder = config.getPlaceholderAsset();
-            if (placeholder != null) {
-                assets.add(placeholder);
-            }
-        }
+	public final Collection<AssetModel> getPlaceholderAsset(final SlingHttpServletRequest request) {
+		final Collection<AssetModel> assets = new ArrayList<>();
 
-        return assets;
-    }
+		if (!WCMMode.DISABLED.equals(WCMMode.fromRequest(request))) {
+			final Config config = request.adaptTo(Config.class);
+			final AssetModel placeholder = config.getPlaceholderAsset();
+			if (placeholder != null) {
+				assets.add(placeholder);
+			}
+		}
+
+		return assets;
+	}
 }
